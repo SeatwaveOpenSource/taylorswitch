@@ -12,10 +12,8 @@
         var OK = 200;
         xhr.onreadystatechange = function () {
             if (xhr.readyState == DONE && xhr.status == OK) {
-                //var json = JSON.parse(xhr.responseText);
-                //document.getElementById("json").innerHTML = json;
-
-                document.getElementById("json").innerHTML = xhr.responseText;
+                var json = JSON.parse(xhr.responseText);
+                document.getElementById("json").innerHTML = json;
             }
         };
 

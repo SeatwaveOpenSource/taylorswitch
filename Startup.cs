@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -16,36 +17,78 @@ namespace taylorswitch
         {
             loggerFactory.AddConsole();
 
-            if (env.IsDevelopment()) { app.UseDeveloperExceptionPage(); }
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
 
             app.UseDefaultFiles().UseStaticFiles();
 
-            app.MapWhen(context => context.Request.Path == "/getFeatures", _app =>
+            app.Map("/getFeatures", _app =>
             {
                 _app.Run(async context =>
                 {
-                    //var json = ShakeItOff("http://localhost:5000", "/features").Result;
-                    await context.Response.WriteAsync("shake it off!");
+                    var json = await Get("http://localhost:5000", "/features");
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync($"{json}");
+                });
+            });
+
+            app.Map("/updateFeature", _app =>
+            {
+                _app.Run(async context =>
+                {
+                    var json = await Get("http://localhost:5000", "/features");
+                  
+                    if (json == null)
+                    {
+                        context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                        return;
+                    }
+
+                    //foreach or something subscribers ditch the cache
+                    var subscribers = await Get("http://localhost:5000", "/subscribers");
+                    await Send("http://localhost:5001", "/testUpdate");
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync($"{json}");
+                });
+            });
+
+            app.Map("/testUpdate", _app => 
+            {
+                _app.Run(async context =>
+                {
+                    await context.Response.WriteAsync("it worked");
                 });
             });
         }
 
-        private async Task<object> ShakeItOff(string baseUrl, string path)
+        private static async Task<bool> Send(string url, string query)
         {
-            object json = null;
-
             using (var client = new HttpClient())
             {
-                client.BaseAddress = new Uri(baseUrl);
+                client.BaseAddress = new Uri(url);
+
+                var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, query));
+
+                return response.IsSuccessStatusCode;
+            }
+        } 
+
+        private static async Task<object> Get(string url, string query)
+        {
+            object json = null;
+            using (var client = new HttpClient())
+            {
+                client.BaseAddress = new Uri(url);
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
 
-                var response = await client.GetAsync(path);
+                var response = await client.GetAsync(query);
                 if (response.IsSuccessStatusCode)
                 {
-                    json = await response.Content.ReadAsAsync<object>();
+                    json = await response.Content.ReadAsStringAsync();
                 }
             }
-
             return json;
         }
 

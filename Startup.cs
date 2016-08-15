@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace taylorswitch
 {
@@ -28,7 +31,7 @@ namespace taylorswitch
             {
                 _app.Run(async context =>
                 {
-                    var json = await Get("http://localhost:5000", "/features");
+                    var json = await Get<object>("http://localhost:5000", "/features");
                     context.Response.ContentType = "application/json";
                     await context.Response.WriteAsync($"{json}");
                 });
@@ -38,23 +41,26 @@ namespace taylorswitch
             {
                 _app.Run(async context =>
                 {
-                    var json = await Get("http://localhost:5000", "/features");
-                  
+                    var json = await Get<object>("http://localhost:5000", "/features");
+
                     if (json == null)
                     {
                         context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                         return;
                     }
 
-                    //foreach or something subscribers ditch the cache
-                    var subscribers = await Get("http://localhost:5000", "/subscribers");
-                    await Send("http://localhost:5001", "/testUpdate");
+                    var subscribers = await Get<List<string>>("http://localhost:5000", "/subscribers");
+
+                    IEnumerable<Task<bool>> updateSubscribers = subscribers.Select(subscriber => Send(subscriber, "/testUpdate"));
+
+                    await Task.WhenAll(updateSubscribers);
+
                     context.Response.ContentType = "application/json";
                     await context.Response.WriteAsync($"{json}");
                 });
             });
 
-            app.Map("/testUpdate", _app => 
+            app.Map("/testUpdate", _app =>
             {
                 _app.Run(async context =>
                 {
@@ -68,16 +74,16 @@ namespace taylorswitch
             using (var client = new HttpClient())
             {
                 client.BaseAddress = new Uri(url);
-
                 var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, query));
 
                 return response.IsSuccessStatusCode;
             }
-        } 
+        }
 
-        private static async Task<object> Get(string url, string query)
+        private static async Task<T> Get<T>(string url, string query) where T : class, new()
         {
-            object json = null;
+            T subscribers = null;
+
             using (var client = new HttpClient())
             {
                 client.BaseAddress = new Uri(url);
@@ -86,10 +92,11 @@ namespace taylorswitch
                 var response = await client.GetAsync(query);
                 if (response.IsSuccessStatusCode)
                 {
-                    json = await response.Content.ReadAsStringAsync();
+                    subscribers = JsonConvert.DeserializeObject<T>(await response.Content.ReadAsStringAsync());
                 }
             }
-            return json;
+
+            return subscribers;
         }
 
         public static void Main(string[] args)

@@ -4,7 +4,9 @@
 </head>
 <body>
     <h1>Taylor Switch</h1>
-    <div id="json">no json yet</div>
+<ul id="json">
+    <li>no json yet</li>
+</ul>
 
     <script>
         var xhr = new XMLHttpRequest();
@@ -13,7 +15,13 @@
         xhr.onreadystatechange = function () {
             if (xhr.readyState == DONE && xhr.status == OK) {
                 var json = JSON.parse(xhr.responseText);
-                document.getElementById("json").innerHTML = json;
+                document.getElementById("json").innerHTML = "";
+                json.forEach(function (item, index) {
+                    var node = document.createElement("li");
+                    var text = document.createTextNode("index: " + index + " " + item.name + ": " + item.enabled);
+                    node.appendChild(text);
+                    document.getElementById("json").appendChild(node);
+                });
             }
         };
 

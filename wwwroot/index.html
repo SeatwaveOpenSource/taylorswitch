@@ -1,13 +1,158 @@
 ﻿<html>
 <head>
     <title>Taylor Switch</title>
+    <style>
+        ul,
+        li {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .tg-list {
+            text-align: center;
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-box-align: center;
+            -webkit-align-items: center;
+            -ms-flex-align: center;
+            align-items: center;
+        }
+
+        .tg-list-item {
+            margin: 0 2em;
+        }
+
+        h2 {
+            color: #777;
+        }
+
+        h4 {
+            color: #999;
+        }
+
+        .tgl {
+            display: none;
+        }
+
+            .tgl, .tgl:after, .tgl:before, .tgl *, .tgl *:after, .tgl *:before, .tgl + .tgl-btn {
+                box-sizing: border-box;
+            }
+
+                .tgl::-moz-selection, .tgl:after::-moz-selection, .tgl:before::-moz-selection, .tgl *::-moz-selection, .tgl *:after::-moz-selection, .tgl *:before::-moz-selection, .tgl + .tgl-btn::-moz-selection {
+                    background: none;
+                }
+
+                .tgl::selection, .tgl:after::selection, .tgl:before::selection, .tgl *::selection, .tgl *:after::selection, .tgl *:before::selection, .tgl + .tgl-btn::selection {
+                    background: none;
+                }
+
+                .tgl + .tgl-btn {
+                    outline: 0;
+                    display: block;
+                    width: 4em;
+                    height: 2em;
+                    position: relative;
+                    cursor: pointer;
+                    -webkit-user-select: none;
+                    -moz-user-select: none;
+                    -ms-user-select: none;
+                    user-select: none;
+                }
+
+                    .tgl + .tgl-btn:after, .tgl + .tgl-btn:before {
+                        position: relative;
+                        display: block;
+                        content: "";
+                        width: 50%;
+                        height: 100%;
+                    }
+
+                    .tgl + .tgl-btn:after {
+                        left: 0;
+                    }
+
+                    .tgl + .tgl-btn:before {
+                        display: none;
+                    }
+
+                .tgl:checked + .tgl-btn:after {
+                    left: 50%;
+                }
+
+        .tgl-flip + .tgl-btn {
+            padding: 2px;
+            -webkit-transition: all .2s ease;
+            transition: all .2s ease;
+            font-family: sans-serif;
+            -webkit-perspective: 100px;
+            perspective: 100px;
+        }
+
+            .tgl-flip + .tgl-btn:after, .tgl-flip + .tgl-btn:before {
+                display: inline-block;
+                -webkit-transition: all .4s ease;
+                transition: all .4s ease;
+                width: 100%;
+                text-align: center;
+                position: absolute;
+                line-height: 2em;
+                font-weight: bold;
+                color: #fff;
+                position: absolute;
+                top: 0;
+                left: 0;
+                -webkit-backface-visibility: hidden;
+                backface-visibility: hidden;
+                border-radius: 4px;
+            }
+
+            .tgl-flip + .tgl-btn:after {
+                content: attr(data-tg-on);
+                background: #02C66F;
+                -webkit-transform: rotateY(-180deg);
+                transform: rotateY(-180deg);
+            }
+
+            .tgl-flip + .tgl-btn:before {
+                background: #FF3A19;
+                content: attr(data-tg-off);
+            }
+
+            .tgl-flip + .tgl-btn:active:before {
+                -webkit-transform: rotateY(-20deg);
+                transform: rotateY(-20deg);
+            }
+
+        .tgl-flip:checked + .tgl-btn:before {
+            -webkit-transform: rotateY(180deg);
+            transform: rotateY(180deg);
+        }
+
+        .tgl-flip:checked + .tgl-btn:after {
+            -webkit-transform: rotateY(0);
+            transform: rotateY(0);
+            left: 0;
+            background: #7FC6A6;
+        }
+
+        .tgl-flip:checked + .tgl-btn:active:after {
+            -webkit-transform: rotateY(20deg);
+            transform: rotateY(20deg);
+        }
+    </style>
 </head>
 <body>
     <h1>Taylor Switch</h1>
-<ul id="json">
-    <li>no json yet</li>
-</ul>
-
+    <ul id="json">
+        <li>no json yet</li>
+        <li class="tg-list-item">
+            <input id="cb5" type="checkbox" class="tgl tgl-flip" />
+            <label data-tg-off="Off" data-tg-on="On" for="cb5" class="tgl-btn"></label>
+        </li>
+    </ul>
     <script>
         var xhr = new XMLHttpRequest();
         var DONE = 4;
@@ -17,16 +162,50 @@
                 var json = JSON.parse(xhr.responseText);
                 document.getElementById("json").innerHTML = "";
                 json.forEach(function (item, index) {
-                    var node = document.createElement("li");
-                    var text = document.createTextNode("index: " + index + " " + item.name + ": " + item.enabled);
-                    node.appendChild(text);
-                    document.getElementById("json").appendChild(node);
+
+                    var feature = document.createElement("li");
+                    var name = document.createTextNode(item.name);
+                    var checkbox = document.createElement("input");
+                    var label = document.createElement("label");
+
+                    checkbox.setAttribute("id", "cb" + index);
+                    checkbox.type = "checkbox";
+                    checkbox.setAttribute("class", "tgl tgl-flip");
+                    checkbox.setAttribute("onclick", "updateFeatures(" + '"' + item.name + '"' + ")");
+                    item.enabled ? checkbox.setAttribute("checked", "") : checkbox.setAttribute("notChecked", "");
+
+                    label.setAttribute("for", "cb" + index);
+                    label.setAttribute("data-tg-off", "Off");
+                    label.setAttribute("data-tg-on", "On");
+                    label.setAttribute("class", "tgl-btn");
+
+                    feature.setAttribute("class", "tg-list-item");
+                    feature.appendChild(name);
+                    feature.appendChild(checkbox);
+                    feature.appendChild(label);
+
+                    document.getElementById("json").appendChild(feature);
+                    localStorage.setItem(item.name, item.enabled);
                 });
             }
         };
 
         xhr.open("GET", "http://localhost:5001/getFeatures", true);
         xhr.send();
+
+        function updateFeatures(name) {
+            var featureStatus = localStorage.getItem(name);
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == DONE && xhr.status == OK) {
+                    console.log(featureStatus != "true");
+                }
+            }
+            xhr.open('POST', "http://localhost:5001/updateFeature", true);
+            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.send(JSON.stringify({ name: name, enabled: featureStatus != "true" }));
+        }
     </script>
 </body>
 </html>

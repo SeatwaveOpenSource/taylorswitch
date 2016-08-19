@@ -1,0 +1,6 @@
+﻿{
+  "featuresBaseUrl": "http://localhost:5000",
+  "featuresRequestUri": "/features",
+  "subscribersBaseUrl": "http://localhost:5000",
+  "subscribersRequestUri": "/subscribers"
+}

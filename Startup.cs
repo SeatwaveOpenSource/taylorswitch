@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -16,8 +17,21 @@ namespace taylorswitch
 {
     public class Startup
     {
+        public IConfigurationRoot Configuration { get; set; }
+
+        public Startup(IHostingEnvironment env)
+        {
+            Configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile($"{env.EnvironmentName}.setup.json", optional: true)
+                .Build();
+        }
+
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
         {
+            var featuresBaseUrl = Configuration.GetSection("featuresBaseUrl").Value;
+            var featuresRequestUri = Configuration.GetSection("featuresRequestUri").Value;
+
             loggerFactory.AddConsole();
 
             if (env.IsDevelopment())
@@ -31,7 +45,7 @@ namespace taylorswitch
             {
                 _app.Run(async context =>
                 {
-                    var json = await Get<object>("http://localhost:5000", "/features");
+                    var json = await Get<object>(featuresBaseUrl, featuresRequestUri);
                     context.Response.ContentType = "application/json";
                     await context.Response.WriteAsync($"{json}");
                 });
@@ -41,46 +55,56 @@ namespace taylorswitch
             {
                 _app.Run(async context =>
                 {
-                    var json = await Get<object>("http://localhost:5000", "/features");
-
-                    if (json == null)
+                    if (!(await Send(featuresBaseUrl, featuresRequestUri, context.Request.Body)))
                     {
                         context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                         return;
                     }
 
-                    var subscribers = await Get<List<string>>("http://localhost:5000", "/subscribers");
+                    var subscribersBaseUrl = Configuration.GetSection("subscribersBaseUrl").Value;
+                    var subscribersRequestUri = Configuration.GetSection("subscribersRequestUri").Value;
 
-                    IEnumerable<Task<bool>> updateSubscribers = subscribers.Select(subscriber => Send(subscriber, "/testUpdate"));
+                    var subscribers = await Get<List<string>>(subscribersBaseUrl, subscribersRequestUri);
+
+                    IEnumerable<Task<bool>> updateSubscribers = subscribers.Select(subscriber => Send(subscriber, "/killCache"));
 
                     await Task.WhenAll(updateSubscribers);
 
-                    context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsync($"{json}");
-                });
-            });
-
-            app.Map("/testUpdate", _app =>
-            {
-                _app.Run(async context =>
-                {
-                    await context.Response.WriteAsync("it worked");
+                    context.Response.StatusCode = (int)HttpStatusCode.Accepted;
                 });
             });
         }
 
-        private static async Task<bool> Send(string url, string query)
+        private static async Task<bool> Send(string url, string requestUri)
         {
             using (var client = new HttpClient())
             {
                 client.BaseAddress = new Uri(url);
-                var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, query));
+
+                var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, requestUri));
 
                 return response.IsSuccessStatusCode;
             }
         }
 
-        private static async Task<T> Get<T>(string url, string query) where T : class, new()
+        private static async Task<bool> Send(string url, string requestUri, Stream data)
+        {
+            using (var client = new HttpClient())
+            {
+                client.BaseAddress = new Uri(url);
+
+                string json;
+                using (var sr = new StreamReader(data))
+                    json = sr.ReadToEnd();
+
+                var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+                var response = await client.PostAsync(requestUri, httpContent);
+
+                return response.IsSuccessStatusCode;
+            }
+        }
+
+        private static async Task<T> Get<T>(string url, string requestUri) where T : class, new()
         {
             T subscribers = null;
 
@@ -89,7 +113,7 @@ namespace taylorswitch
                 client.BaseAddress = new Uri(url);
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
 
-                var response = await client.GetAsync(query);
+                var response = await client.GetAsync(requestUri);
                 if (response.IsSuccessStatusCode)
                 {
                     subscribers = JsonConvert.DeserializeObject<T>(await response.Content.ReadAsStringAsync());

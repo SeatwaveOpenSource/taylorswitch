@@ -157,6 +157,7 @@
         var xhr = new XMLHttpRequest();
         var DONE = 4;
         var OK = 200;
+
         xhr.onreadystatechange = function () {
             if (xhr.readyState == DONE && xhr.status == OK) {
                 var json = JSON.parse(xhr.responseText);
@@ -185,26 +186,54 @@
                     feature.appendChild(label);
 
                     document.getElementById("json").appendChild(feature);
-                    localStorage.setItem(item.name, item.enabled);
+                    localStorage.setItem(item.name, JSON.stringify(item));
                 });
             }
         };
 
-        xhr.open("GET", "http://localhost:5001/getFeatures", true);
+        xhr.open("GET", "http://localhost:5005/features", true);
         xhr.send();
 
+        var subXhr = new XMLHttpRequest();
+
+        subXhr.onreadystatechange = function () {
+            if (subXhr.readyState == DONE && subXhr.status == OK) {
+                localStorage.setItem("subscribers", subXhr.responseText);
+            }
+        };
+
+        subXhr.open("GET", "http://localhost:5005/subscribers", true);
+        subXhr.send();
+
         function updateFeatures(name) {
-            var featureStatus = localStorage.getItem(name);
+            var feature = JSON.parse(localStorage.getItem(name));
+            feature.enabled = !feature.enabled; //flip the switch
             var xhr = new XMLHttpRequest();
             xhr.onreadystatechange = function () {
                 if (xhr.readyState == DONE && xhr.status == OK) {
-                    console.log(featureStatus != "true");
+
+                    localStorage.setItem(name, JSON.stringify(feature));
+                    var subscribers = JSON.parse(localStorage.getItem("subscribers"));
+                    subscribers.map(function (subscriber) {
+                        var xhr = new XMLHttpRequest();
+
+                        xhr.onreadystatechange = function () {
+                            if (subXhr.readyState == DONE && subXhr.status == OK) {
+                                console.log("yay!");
+                            }
+                        };
+
+                        xhr.open('POST', subscriber + "/killcache", true);
+                        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+                        xhr.setRequestHeader("Accept", "application/json");
+                        xhr.send(name);
+                    });
                 }
             }
-            xhr.open('POST', "http://localhost:5001/updateFeature", true);
+            xhr.open('POST', "http://localhost:5005/features/" + feature.id, true);
             xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
             xhr.setRequestHeader("Accept", "application/json");
-            xhr.send(JSON.stringify({ name: name, enabled: featureStatus != "true" }));
+            xhr.send(JSON.stringify({ key: "enabled", value: feature.enabled }));
         }
     </script>
 </body>

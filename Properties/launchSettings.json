@@ -1,8 +1,7 @@
 {
   "profiles": {
     "taylorswitch": {
-      "commandName": "Project",
-      "launchUrl": "http://localhost:5001"
+      "commandName": "Project"
     }
   }
 }

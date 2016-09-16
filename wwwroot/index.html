@@ -153,88 +153,119 @@
             <label data-tg-off="Off" data-tg-on="On" for="cb5" class="tgl-btn"></label>
         </li>
     </ul>
+    <script type="text/javascript" src="setup.json"></script>
     <script>
-        var xhr = new XMLHttpRequest();
-        var DONE = 4;
-        var OK = 200;
+        var updateFeatures;
 
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == DONE && xhr.status == OK) {
-                var json = JSON.parse(xhr.responseText);
+        function httpRequest(settings) {
+            return new Promise(function (onComplete) {
+                var DONE = 4;
+                var OK = 200;
+                var r = new XMLHttpRequest();
+                if (settings.mimeType) {
+                    r.overrideMimeType(settings.mimeType);
+                }
+                r.open(settings.method, settings.url, settings.async);
+                if (settings.requestHeaders) {
+                    settings.requestHeaders.map(function (requestHeader) {
+                        r.setRequestHeader(requestHeader.header, requestHeader.value);
+                    });
+                }
+                r.onreadystatechange = function () {
+                    if (r.readyState === DONE && r.status == OK) {
+                        onComplete(r.responseText);
+                    }
+                }
+                r.send(settings.data);
+            });
+        }
+
+        httpRequest({
+            mimeType: "application/json",
+            method: "GET",
+            url: "setup.json",
+            async: true
+        }).then(function (data) {
+
+            var settings = JSON.parse(data);
+
+            httpRequest({
+                method: "GET",
+                url: settings.subscribersBaseUrl + settings.subscribersRequestUri,
+                async: true
+            }).then(function (data) {
+                localStorage.setItem("subscribers", data);
+            });
+
+            httpRequest({
+                method: "GET",
+                url: settings.featuresBaseUrl + settings.featuresRequestUri,
+                async: true
+            }).then(function (data) {
+                var json = JSON.parse(data);
                 document.getElementById("json").innerHTML = "";
                 json.forEach(function (item, index) {
 
-                    var feature = document.createElement("li");
-                    var name = document.createTextNode(item.name);
-                    var checkbox = document.createElement("input");
-                    var label = document.createElement("label");
+                var feature = document.createElement("li");
+                var name = document.createTextNode(item.name);
+                var checkbox = document.createElement("input");
+                var label = document.createElement("label");
 
-                    checkbox.setAttribute("id", "cb" + index);
-                    checkbox.type = "checkbox";
-                    checkbox.setAttribute("class", "tgl tgl-flip");
-                    checkbox.setAttribute("onclick", "updateFeatures(" + '"' + item.name + '"' + ")");
-                    item.enabled ? checkbox.setAttribute("checked", "") : checkbox.setAttribute("notChecked", "");
+                checkbox.setAttribute("id", "cb" + index);
+                checkbox.type = "checkbox";
+                checkbox.setAttribute("class", "tgl tgl-flip");
+                checkbox.setAttribute("onclick", "updateFeatures(" + '"' + item.name + '"' + ")");
+                item.enabled ? checkbox.setAttribute("checked", "") : checkbox.setAttribute("notChecked", "");
 
-                    label.setAttribute("for", "cb" + index);
-                    label.setAttribute("data-tg-off", "Off");
-                    label.setAttribute("data-tg-on", "On");
-                    label.setAttribute("class", "tgl-btn");
+                label.setAttribute("for", "cb" + index);
+                label.setAttribute("data-tg-off", "Off");
+                label.setAttribute("data-tg-on", "On");
+                label.setAttribute("class", "tgl-btn");
 
-                    feature.setAttribute("class", "tg-list-item");
-                    feature.appendChild(name);
-                    feature.appendChild(checkbox);
-                    feature.appendChild(label);
+                feature.setAttribute("class", "tg-list-item");
+                feature.appendChild(name);
+                feature.appendChild(checkbox);
+                feature.appendChild(label);
 
-                    document.getElementById("json").appendChild(feature);
-                    localStorage.setItem(item.name, JSON.stringify(item));
+                document.getElementById("json").appendChild(feature);
+                localStorage.setItem(item.name, JSON.stringify(item));
                 });
-            }
-        };
+            });
 
-        xhr.open("GET", "http://localhost:5005/features", true);
-        xhr.send();
+            updateFeatures = function (name) {
+                var feature = JSON.parse(localStorage.getItem(name));
+                feature.enabled = !feature.enabled; //flip the switch
 
-        var subXhr = new XMLHttpRequest();
-
-        subXhr.onreadystatechange = function () {
-            if (subXhr.readyState == DONE && subXhr.status == OK) {
-                localStorage.setItem("subscribers", subXhr.responseText);
-            }
-        };
-
-        subXhr.open("GET", "http://localhost:5005/subscribers", true);
-        subXhr.send();
-
-        function updateFeatures(name) {
-            var feature = JSON.parse(localStorage.getItem(name));
-            feature.enabled = !feature.enabled; //flip the switch
-            var xhr = new XMLHttpRequest();
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState == DONE && xhr.status == OK) {
+                httpRequest({
+                    method: "POST",
+                    url: settings.featuresBaseUrl + settings.featuresRequestUri + feature.id,
+                    async: true,
+                    requestHeaders: [
+                        { header: "Content-Type", value: "application/json;charset=UTF-8" },
+                        { header: "Accept", value: "application/json" }
+                    ],
+                    data: JSON.stringify({ key: "enabled", value: feature.enabled })
+                }).then(function () {
 
                     localStorage.setItem(name, JSON.stringify(feature));
                     var subscribers = JSON.parse(localStorage.getItem("subscribers"));
                     subscribers.map(function (subscriber) {
-                        var xhr = new XMLHttpRequest();
-
-                        xhr.onreadystatechange = function () {
-                            if (subXhr.readyState == DONE && subXhr.status == OK) {
-                                console.log("yay!");
-                            }
-                        };
-
-                        xhr.open('POST', subscriber + "/killcache", true);
-                        xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-                        xhr.setRequestHeader("Accept", "application/json");
-                        xhr.send(name);
+                        httpRequest({
+                            method: "POST",
+                            url: subscriber + "/killcache",
+                            async: true,
+                            requestHeaders: [
+                                { header: "Content-Type", value: "application/json;charset=UTF-8" },
+                                { header: "Accept", value: "application/json" }
+                            ],
+                            data: name
+                        }).then(function () {
+                            console.log("yay!");
+                        });
                     });
-                }
+                });
             }
-            xhr.open('POST', "http://localhost:5005/features/" + feature.id, true);
-            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-            xhr.setRequestHeader("Accept", "application/json");
-            xhr.send(JSON.stringify({ key: "enabled", value: feature.enabled }));
-        }
+        });
     </script>
 </body>
 </html>

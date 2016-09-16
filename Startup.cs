@@ -13,9 +13,7 @@ namespace taylorswitch
             loggerFactory.AddConsole();
 
             if (env.IsDevelopment())
-            {
                 app.UseDeveloperExceptionPage();
-            }
 
             app.UseDefaultFiles().UseStaticFiles();
         }
@@ -26,11 +24,11 @@ namespace taylorswitch
 
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(currentDirectory)
-                .AddJsonFile("setup.json", optional: true)
+                .AddJsonFile("wwwroot/setup.json", optional: true)
                 .Build();
 
             new WebHostBuilder()
-                .UseConfiguration(configuration.GetSection("server.urls"))
+                .UseUrls(configuration.GetSection("server.urls").Value)
                 .UseContentRoot(currentDirectory)
                 .UseKestrel()
                 .UseIISIntegration()
